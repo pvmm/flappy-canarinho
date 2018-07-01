@@ -1,0 +1,113 @@
+#!/bin/env python3
+
+from os import path, getcwd
+
+# Carregar ambiente virtual
+if path.exists(path.join(getcwd(), 'venv')):
+	activate_this = path.join(getcwd(), 'venv/bin/activate_this.py')
+	with open(activate_this) as file_:
+		exec(file_.read(), dict(__file__ = activate_this))
+
+# Inicialização
+import pygame
+from pygame.time import get_ticks
+from pygame import Rect
+pygame.init()
+
+tela = pygame.display.set_mode((700, 497))
+pygame.display.set_caption('Canarinho Pistola')
+relogio = pygame.time.Clock()
+
+
+# Variáveis e constantes
+PRETO = (0, 0, 0)
+G = 0.001; X = 0; Y = 1
+local = getcwd()
+IMPULSO_INICIAL = -0.002
+CANARINHO = pygame.image.load(path.join(local, 'jogador-pequeno.png')).convert_alpha()
+POSICAO_INICIAL = (100, 200)
+MARGEM_INFERIOR = 200
+terminado = False
+
+
+#
+# Funções úteis.
+#
+
+def pulou(jogador, frame):
+	jogador['frame'] = frame
+	jogador['impulso'] = -0.010
+	jogador['velocidade'] = 0
+	print('Pulou em ' + str(frame))
+
+
+def atualiza_altura(jogador, frame):
+	t = frame - jogador['frame']
+	jogador['frame'] = frame
+
+	# Equações de movimento, entrem em ação!
+	g = G + jogador['impulso'] # somatório das forças
+	v = jogador['velocidade'] + (g * t); # v = vo + at
+	h = jogador['posicao'][Y] + (v * t) + (0.5 * g * t * t); # s = s0 + vt + 0.5 * gt^2
+
+	jogador['impulso'] = 0
+	jogador['posicao'][Y] = h
+	jogador['velocidade'] = v
+
+
+def criar_jogador():
+	jogador = {
+		'imagem': CANARINHO,
+		'tamanho' : CANARINHO.get_size(),
+		'posicao': list(POSICAO_INICIAL),
+		'frame': get_ticks(),
+		'velocidade': 0,
+		'impulso': IMPULSO_INICIAL,
+	}
+
+	return jogador
+
+
+pygame.time.wait(500)
+jogador = criar_jogador()
+
+while not terminado:
+	# Atualiza tela.
+	frame = get_ticks()
+
+	# Limpa região da tela usada no frame anterior.
+	area0 = Rect(jogador['posicao'], jogador['tamanho'])
+	pygame.draw.rect(tela, PRETO, area0)
+
+	# Atualiza posição do jogador na tela.
+	atualiza_altura(jogador, frame)
+
+	# Processa posição e recria jogador que caiu fora da tela.
+	if jogador['posicao'][Y] - MARGEM_INFERIOR > tela.get_size()[Y]:
+		jogador = criar_jogador()
+		print('caiu!')
+
+	# Desenha jogador e atualiza região desenhada da tela.
+	area1 = pygame.Rect(jogador['posicao'], jogador['tamanho'])
+	tela.blit(jogador['imagem'], jogador['posicao'])
+	pygame.display.update((area0, area1))
+
+	# Processa teclado
+	for event in pygame.event.get(pygame.KEYUP) :
+
+		# Pula com a tecla de espaço.
+		if jogador['posicao'][Y] > 0:
+			if event.key == pygame.K_SPACE:
+				pulou(jogador, frame)
+
+		# Sai do programa ao teclar ESC.
+		if event.key == pygame.K_ESCAPE:
+			terminado = True
+
+	# Detecta evento de fechar janela.
+	if pygame.event.get(pygame.QUIT):
+		exit()
+
+	# 30 frames por segundo.
+	relogio.tick(30)
+
