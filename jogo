@@ -34,17 +34,13 @@ terminado = False
 # Funções úteis.
 #
 
-def pulou(jogador, frame):
-	jogador['frame'] = frame
+def pulou(jogador):
 	jogador['impulso'] = -0.010
 	jogador['velocidade'] = 0
-	print('Pulou em ' + str(frame))
+	print('pulou!')
 
 
-def atualiza_altura(jogador, frame):
-	t = frame - jogador['frame']
-	jogador['frame'] = frame
-
+def atualiza_altura(jogador, t):
 	# Equações de movimento, entrem em ação!
 	g = G + jogador['impulso'] # somatório das forças
 	v = jogador['velocidade'] + (g * t); # v = vo + at
@@ -56,31 +52,31 @@ def atualiza_altura(jogador, frame):
 
 
 def criar_jogador():
-	jogador = {
+	return {
 		'imagem': CANARINHO,
-		'tamanho' : CANARINHO.get_size(),
+		'tamanho': CANARINHO.get_size(),
 		'posicao': list(POSICAO_INICIAL),
-		'frame': get_ticks(),
 		'velocidade': 0,
 		'impulso': IMPULSO_INICIAL,
 	}
 
-	return jogador
 
-
+# Preparação inicial para o loop
 pygame.time.wait(500)
 jogador = criar_jogador()
+antes = get_ticks()
 
 while not terminado:
-	# Atualiza tela.
-	frame = get_ticks()
+	# Atualiza temporização.
+	agora = get_ticks()
+	duração = agora - antes
 
 	# Limpa região da tela usada no frame anterior.
 	area0 = Rect(jogador['posicao'], jogador['tamanho'])
 	pygame.draw.rect(tela, PRETO, area0)
 
 	# Atualiza posição do jogador na tela.
-	atualiza_altura(jogador, frame)
+	atualiza_altura(jogador, duração)
 
 	# Processa posição e recria jogador que caiu fora da tela.
 	if jogador['posicao'][Y] - MARGEM_INFERIOR > tela.get_size()[Y]:
@@ -88,7 +84,7 @@ while not terminado:
 		print('caiu!')
 
 	# Desenha jogador e atualiza região desenhada da tela.
-	area1 = pygame.Rect(jogador['posicao'], jogador['tamanho'])
+	area1 = Rect(jogador['posicao'], jogador['tamanho'])
 	tela.blit(jogador['imagem'], jogador['posicao'])
 	pygame.display.update((area0, area1))
 
@@ -98,7 +94,7 @@ while not terminado:
 		# Pula com a tecla de espaço.
 		if jogador['posicao'][Y] > 0:
 			if event.key == pygame.K_SPACE:
-				pulou(jogador, frame)
+				pulou(jogador)
 
 		# Sai do programa ao teclar ESC.
 		if event.key == pygame.K_ESCAPE:
@@ -110,4 +106,5 @@ while not terminado:
 
 	# 30 frames por segundo.
 	relogio.tick(30)
+	antes = agora
 
