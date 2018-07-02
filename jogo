@@ -1,6 +1,7 @@
 #!/bin/env python3
 
 from os import path, getcwd
+from ninepatch import Ninepatch
 
 # Carregar ambiente virtual
 if path.exists(path.join(getcwd(), 'venv')):
@@ -12,12 +13,13 @@ if path.exists(path.join(getcwd(), 'venv')):
 import pygame
 from pygame.time import get_ticks
 from pygame import Rect
-pygame.init()
+from PIL import Image
+import random
 
+pygame.init()
 tela = pygame.display.set_mode((700, 497))
 pygame.display.set_caption('Canarinho Pistola')
 relogio = pygame.time.Clock()
-
 
 # Variáveis e constantes
 PRETO = (0, 0, 0)
@@ -25,10 +27,13 @@ G = 0.001; X = 0; Y = 1
 local = getcwd()
 IMPULSO_INICIAL = -0.002
 CANARINHO = pygame.image.load(path.join(local, 'jogador-pequeno.png')).convert_alpha()
+OBSTACULO = Ninepatch(path.join(local, 'obstaculo.9.png'))
 POSICAO_INICIAL = (100, 200)
 MARGEM_INFERIOR = 200
+ABERTURA = 40
+LARGURA = 80
+MARGEM = 50
 terminado = False
-
 
 #
 # Funções úteis.
@@ -37,7 +42,6 @@ terminado = False
 def pulou(jogador):
 	jogador['impulso'] = -0.010
 	jogador['velocidade'] = 0
-	print('pulou!')
 
 
 def atualiza_altura(jogador, t):
@@ -61,9 +65,33 @@ def criar_jogador():
 	}
 
 
-# Preparação inicial para o loop
+def atualiza_obstaculo(obstaculo, t):
+	obstaculo['posicao1'][X] -= obstaculo['velocidade'] * t
+	obstaculo['posicao2'][X] -= obstaculo['velocidade'] * t
+
+
+def criar_obstaculo():
+	comprimento, altura = tela.get_size()
+	começo_buraco = random.randint(50, altura - ABERTURA)
+	fim_buraco = altura - começo_buraco - ABERTURA
+	obstaculo1 = OBSTACULO.render(LARGURA, começo_buraco)
+	obstaculo2 = OBSTACULO.render(LARGURA, fim_buraco + MARGEM)
+
+	return {
+		'imagem1': pygame.image.fromstring(obstaculo1.tobytes(), obstaculo1.size, obstaculo1.mode),
+		'tamanho1': (LARGURA, começo_buraco),
+		'posicao1': [comprimento, -MARGEM],
+		'imagem2': pygame.image.fromstring(obstaculo2.tobytes(), obstaculo2.size, obstaculo2.mode),
+		'tamanho2': (LARGURA, fim_buraco),
+		'posicao2': [comprimento, começo_buraco + ABERTURA + MARGEM],
+		'velocidade' : 0.1,
+	}
+
+
+# Preparação inicial
 pygame.time.wait(500)
 jogador = criar_jogador()
+obstaculo = criar_obstaculo()
 antes = get_ticks()
 
 while not terminado:
@@ -74,6 +102,19 @@ while not terminado:
 	# Limpa região da tela usada no frame anterior.
 	area0 = Rect(jogador['posicao'], jogador['tamanho'])
 	pygame.draw.rect(tela, PRETO, area0)
+
+	# Limpa região da tela dos obstáculos
+	area2 = Rect(obstaculo['posicao1'], obstaculo['tamanho1'])
+	area3 = Rect(obstaculo['posicao2'], obstaculo['tamanho2'])
+	pygame.draw.rect(tela, PRETO, area2)
+	pygame.draw.rect(tela, PRETO, area3)
+
+	# Atualiza posição dos obstáculos
+	atualiza_obstaculo(obstaculo, duração)
+	tela.blit(obstaculo['imagem1'], obstaculo['posicao1'])
+	tela.blit(obstaculo['imagem2'], obstaculo['posicao2'])
+	area4 = Rect(obstaculo['posicao1'], obstaculo['tamanho1'])
+	area5 = Rect(obstaculo['posicao2'], obstaculo['tamanho2'])
 
 	# Atualiza posição do jogador na tela.
 	atualiza_altura(jogador, duração)
@@ -86,7 +127,7 @@ while not terminado:
 	# Desenha jogador e atualiza região desenhada da tela.
 	area1 = Rect(jogador['posicao'], jogador['tamanho'])
 	tela.blit(jogador['imagem'], jogador['posicao'])
-	pygame.display.update((area0, area1))
+	pygame.display.update((area0, area2, area3, area4, area5, area1))
 
 	# Processa teclado
 	for event in pygame.event.get(pygame.KEYUP) :
