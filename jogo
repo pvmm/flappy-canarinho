@@ -1,7 +1,7 @@
 #!/bin/env python3
+# vim: tabstop=4
 
 from os import path, getcwd
-from ninepatch import Ninepatch
 
 # Carregar ambiente virtual
 if path.exists(path.join(getcwd(), 'venv')):
@@ -11,10 +11,12 @@ if path.exists(path.join(getcwd(), 'venv')):
 
 # Inicialização
 import pygame
+import random
+
 from pygame.time import get_ticks
 from pygame import Rect
 from PIL import Image
-import random
+from ninepatch import Ninepatch
 
 pygame.init()
 tela = pygame.display.set_mode((700, 497))
@@ -24,15 +26,18 @@ relogio = pygame.time.Clock()
 # Variáveis e constantes
 PRETO = (0, 0, 0)
 G = 0.001; X = 0; Y = 1
+VELOCIDADE_OBSTÁCULO = 0.1
+PARTE1 = 0; PARTE2 = 1;
 local = getcwd()
 IMPULSO_INICIAL = -0.002
 CANARINHO = pygame.image.load(path.join(local, 'jogador-pequeno.png')).convert_alpha()
-OBSTACULO = Ninepatch(path.join(local, 'obstaculo.9.png'))
+OBSTÁCULO = Ninepatch(path.join(local, 'obstaculo.9.png'))
 POSICAO_INICIAL = (100, 200)
 MARGEM_INFERIOR = 200
 ABERTURA = 40
 LARGURA = 80
 MARGEM = 50
+obstáculos = []
 terminado = False
 
 #
@@ -48,94 +53,138 @@ def atualiza_altura(jogador, t):
 	# Equações de movimento, entrem em ação!
 	g = G + jogador['impulso'] # somatório das forças
 	v = jogador['velocidade'] + (g * t); # v = vo + at
-	h = jogador['posicao'][Y] + (v * t) + (0.5 * g * t * t); # s = s0 + vt + 0.5 * gt^2
+	h = jogador['posição'][Y] + (v * t) + (0.5 * g * t * t); # s = s0 + vt + 0.5 * gt^2
 
 	jogador['impulso'] = 0
-	jogador['posicao'][Y] = h
+	jogador['posição'][Y] = h
 	jogador['velocidade'] = v
 
 
-def criar_jogador():
+def cria_jogador():
 	return {
 		'imagem': CANARINHO,
 		'tamanho': CANARINHO.get_size(),
-		'posicao': list(POSICAO_INICIAL),
+		'posição': list(POSICAO_INICIAL),
 		'velocidade': 0,
 		'impulso': IMPULSO_INICIAL,
 	}
 
 
-def atualiza_obstaculo(obstaculo, t):
-	obstaculo['posicao1'][X] -= obstaculo['velocidade'] * t
-	obstaculo['posicao2'][X] -= obstaculo['velocidade'] * t
+def desenha_obstáculo(tela, obstáculo):
+	"""Desenha obstáculo composto de duas partes e retorna a área na tela que ele ocupa pra depois
+       atualizar tudo num lugar só."""
+	áreas = []
+	áreas.append(Rect(obstáculo[PARTE1]['posição'], obstáculo[PARTE1]['tamanho']))
+	áreas.append(Rect(obstáculo[PARTE2]['posição'], obstáculo[PARTE2]['tamanho']))
+	tela.blit(obstáculo[PARTE1]['imagem'], obstáculo[PARTE1]['posição'])
+	tela.blit(obstáculo[PARTE2]['imagem'], obstáculo[PARTE2]['posição'])
+	return áreas
 
 
-def criar_obstaculo():
-	comprimento, altura = tela.get_size()
-	começo_buraco = random.randint(50, altura - ABERTURA)
-	fim_buraco = altura - começo_buraco - ABERTURA
-	obstaculo1 = OBSTACULO.render(LARGURA, começo_buraco)
-	obstaculo2 = OBSTACULO.render(LARGURA, fim_buraco + MARGEM)
+def atualiza_obstáculo(obstáculo, t):
+	"""Atualiza posição de obstáculo na tela."""
+	obstáculo[PARTE1]['posição'][X] -= VELOCIDADE_OBSTÁCULO * t
+	obstáculo[PARTE2]['posição'][X] -= VELOCIDADE_OBSTÁCULO * t
 
-	return {
-		'imagem1': pygame.image.fromstring(obstaculo1.tobytes(), obstaculo1.size, obstaculo1.mode),
-		'tamanho1': (LARGURA, começo_buraco),
-		'posicao1': [comprimento, -MARGEM],
-		'imagem2': pygame.image.fromstring(obstaculo2.tobytes(), obstaculo2.size, obstaculo2.mode),
-		'tamanho2': (LARGURA, fim_buraco),
-		'posicao2': [comprimento, começo_buraco + ABERTURA + MARGEM],
-		'velocidade' : 0.1,
-	}
+
+def limpa_obstáculo(tela, obstáculo):
+	"""Limpa a região da tela ocupada por obstáculo porque ele vai se mover para um novo lugar.
+       Retorna a região que foi limpada pra depois atualizar tudo num lugar só."""
+	áreas = []
+	áreas.append(Rect(obstáculo[PARTE1]['posição'], obstáculo[PARTE1]['tamanho']))
+	áreas.append(Rect(obstáculo[PARTE2]['posição'], obstáculo[PARTE2]['tamanho']))
+	pygame.draw.rect(tela, PRETO, áreas[0])
+	pygame.draw.rect(tela, PRETO, áreas[1])
+	return áreas
+
+
+def cria_obstáculo(posição = 0):
+	"""Três obstáculos são visíveis ao mesmo tempo na tela, numeráveis de 0 até 2. _posição_ se
+       refere ao obstáculo relativo ao jogador."""
+	dimensão = tela.get_size()
+	posição = (posição + 3) * (dimensão[X] / 2) - LARGURA
+	começo_buraco = random.randint(50, dimensão[Y] - ABERTURA)
+	fim_buraco = dimensão[Y] - começo_buraco - ABERTURA
+	obstáculo1 = OBSTÁCULO.render(LARGURA, começo_buraco)
+	obstáculo2 = OBSTÁCULO.render(LARGURA, fim_buraco + MARGEM)
+
+	return (
+		{
+			'imagem': pygame.image.fromstring(obstáculo1.tobytes(), obstáculo1.size, obstáculo1.mode),
+			'tamanho': (LARGURA, começo_buraco),
+			'posição': [posição, -MARGEM],
+		},
+		{
+			'imagem': pygame.image.fromstring(obstáculo2.tobytes(), obstáculo2.size, obstáculo2.mode),
+			'tamanho': (LARGURA, fim_buraco),
+			'posição': [posição, começo_buraco + ABERTURA + MARGEM],
+		},
+	)
 
 
 # Preparação inicial
 pygame.time.wait(500)
-jogador = criar_jogador()
-obstaculo = criar_obstaculo()
+
+jogador = cria_jogador()
+obstáculos = [cria_obstáculo(0), cria_obstáculo(1), cria_obstáculo(2)]
 antes = get_ticks()
 
 while not terminado:
-	areas = []
+	áreas = []
 
 	# Atualiza temporização.
 	agora = get_ticks()
 	duração = agora - antes
 
-	# Limpa região da tela usada no frame anterior.
-	areas.append(Rect(jogador['posicao'], jogador['tamanho']))
-	pygame.draw.rect(tela, PRETO, areas[0])
+	# Remove obstáculo obsoleto.
+	if obstáculos[0][PARTE1]['posição'][X] < -LARGURA:
+		obstáculos.pop(0)
+		obstáculos.append(cria_obstáculo())
 
-	# Limpa região da tela dos obstáculos
-	area2 = Rect(obstaculo['posicao1'], obstaculo['tamanho1'])
-	area3 = Rect(obstaculo['posicao2'], obstaculo['tamanho2'])
-	pygame.draw.rect(tela, PRETO, area2)
-	pygame.draw.rect(tela, PRETO, area3)
+	# Limpa região da tela usada no frame anterior (áreas: 0)
+	áreas.append(Rect(jogador['posição'], jogador['tamanho']))
+	pygame.draw.rect(tela, PRETO, áreas[0])
 
-	# Atualiza posição dos obstáculos
-	atualiza_obstaculo(obstaculo, duração)
-	tela.blit(obstaculo['imagem1'], obstaculo['posicao1'])
-	tela.blit(obstaculo['imagem2'], obstaculo['posicao2'])
-	area4 = Rect(obstaculo['posicao1'], obstaculo['tamanho1'])
-	area5 = Rect(obstaculo['posicao2'], obstaculo['tamanho2'])
+	# Limpa região da tela dos obstáculos atualiza posição e desenha (áreas: 1, 2, 3, 4, 5, 6)
+	for obstáculo in obstáculos:
+		áreas.extend(limpa_obstáculo(tela, obstáculo))
+		atualiza_obstáculo(obstáculo, duração)
+
+	# Desenha obstáculos na tela (áreas: 7, 8, 9, 10, 11, 12)
+	for obstáculo in obstáculos: 
+		áreas.extend(desenha_obstáculo(tela, obstáculo))
 
 	# Atualiza posição do jogador na tela.
 	atualiza_altura(jogador, duração)
 
-	# Processa posição e recria jogador que caiu fora da tela.
-	if jogador['posicao'][Y] - MARGEM_INFERIOR > tela.get_size()[Y]:
-		jogador = criar_jogador()
+	# Processa posição e reinicia jogo quando jogador cai fora da tela.
+	if jogador['posição'][Y] - MARGEM_INFERIOR > tela.get_size()[Y]:
+		jogador = cria_jogador()
+		obstáculos = [cria_obstáculo(0), cria_obstáculo(1), cria_obstáculo(2)]
+		tela.fill(PRETO)
+		pygame.display.update()
 		print('caiu!')
 
-	# Desenha jogador e atualiza região desenhada da tela.
-	areas.append(Rect(jogador['posicao'], jogador['tamanho']))
-	tela.blit(jogador['imagem'], jogador['posicao'])
-	pygame.display.update(areas)
+	# Desenha jogador e atualiza região desenhada da tela (áreas: 13)
+	áreas.append(Rect(jogador['posição'], jogador['tamanho']))
+	tela.blit(jogador['imagem'], jogador['posição'])
+
+	# Atualiza regiões apagadas e desenhadas na tela.
+	pygame.display.update(áreas) 
+
+	# Detecta colisão com obstáculos e reinicia jogo em caso positivo.
+	if áreas[13].collidelist((áreas[7], áreas[8])) != -1:
+		jogador = cria_jogador()
+		obstáculos = [cria_obstáculo(0), cria_obstáculo(1), cria_obstáculo(2)]
+		tela.fill(PRETO)
+		pygame.display.update()
+		print("colisão detectada!")
 
 	# Processa teclado
 	for event in pygame.event.get(pygame.KEYUP) :
 
 		# Pula com a tecla de espaço.
-		if jogador['posicao'][Y] > 0:
+		if jogador['posição'][Y] > 0:
 			if event.key == pygame.K_SPACE:
 				pulou(jogador)
 
