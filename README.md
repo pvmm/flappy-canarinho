@@ -15,11 +15,13 @@ Em ambiente Debian e derivados, execute:
 ```
 sudo apt-get update
 sudo apt-get install python3 python3-pygame
+sudo pip install -r requirements.txt
 ```
 Também é possível usar o Virtualenv para instalar pygame se você não quiser instalar coisas como root. O código do jogo detecta automaticamente se Virtualenv foi usado ou não. Basta entrar no diretório raiz do projeto e executar:
 ```
 virtualenv venv
 source ./venv/bin/activate
+pip install pygame
 pip install -r requirements.txt
 deactivate
 ```

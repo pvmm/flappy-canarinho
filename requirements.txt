@@ -1,3 +1,2 @@
 ninepatch==0.1.20
 Pillow==5.2.0
-pygame==1.9.3
